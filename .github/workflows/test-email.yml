@@ -1,0 +1,49 @@
+name: Test Email (One-off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create sample briefing
+        run: |
+          cat > /tmp/test-briefing.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head><meta charset="utf-8"><title>简报测试</title></head>
+          <body style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+          <h1>📊 每日金融市场资讯简报 — 测试版</h1>
+          <p>这是一封测试邮件，用于验证邮件发送功能是否正常。</p>
+          <h2>美股收盘</h2>
+          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%">
+            <tr style="background:#f0f0f0"><th>指数</th><th>收盘点位</th><th>当日涨跌幅</th><th>YTD</th></tr>
+            <tr><td>标普500 (S&P 500)</td><td>5,842.31</td><td>+0.67%</td><td>+9.14%</td></tr>
+            <tr><td>纳斯达克 (Nasdaq)</td><td>18,923.56</td><td>+0.76%</td><td>+6.83%</td></tr>
+            <tr><td>道琼斯 (DJIA)</td><td>42,108.44</td><td>+0.45%</td><td>+4.21%</td></tr>
+          </table>
+          <h2>🏦 华尔街观点（示例）</h2>
+          <p><strong>高盛：</strong>维持年底标普500目标价6,500点，超配科技与AI基础设施。</p>
+          <p><strong>摩根士丹利：</strong>建议缩短组合久期，10年期美债或测试4.75%阻力位。</p>
+          <hr>
+          <p style="color:gray; font-size:12px">
+            简报生成时间：测试 | 
+            数据来源：Bloomberg、华尔街见闻、金融时报、华尔街日报等
+          </p>
+          </body>
+          </html>
+          EOF
+
+      - name: Send test email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "📊 【测试】每日金融市场资讯简报"
+          to: samchen3129@gmail.com
+          from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
+          html_body: file:///tmp/test-briefing.html
