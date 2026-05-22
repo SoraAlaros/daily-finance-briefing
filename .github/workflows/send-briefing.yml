@@ -38,8 +38,8 @@ jobs:
       - name: Convert Markdown to HTML and PDF
         if: steps.briefing.outputs.skip != 'true'
         run: |
-          # 生成带 CSS 的 HTML（邮件正文用）
-          cat > /tmp/style.css << 'EOF'
+          cat > /tmp/style-header.html << 'EOF'
+          <style>
           body { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.7; }
           h1 { color: #1a1a1a; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
           h2 { color: #2563eb; margin-top: 28px; }
@@ -51,15 +51,15 @@ jobs:
           a { color: #2563eb; }
           hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
           p { margin: 6px 0; }
+          </style>
           EOF
 
           pandoc "${{ steps.briefing.outputs.file }}" \
             -f markdown -t html -s \
-            --css /tmp/style.css \
+            -H /tmp/style-header.html \
             --metadata title="每日金融市场资讯简报 ${{ steps.briefing.outputs.date }}" \
             -o /tmp/briefing.html
 
-          # 生成 PDF（附件用）
           wkhtmltopdf \
             --encoding utf-8 \
             --page-size A4 \
