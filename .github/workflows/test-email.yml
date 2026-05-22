@@ -47,7 +47,9 @@ jobs:
           *数据来源：Bloomberg、华尔街见闻、金融时报、华尔街日报等*
           EOF
 
-          cat > /tmp/style.css << 'EOF'
+          # 内嵌 CSS 的 header 文件（避免 wkhtmltopdf 加载外部文件）
+          cat > /tmp/style-header.html << 'EOF'
+          <style>
           body { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.7; }
           h1 { color: #1a1a1a; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
           h2 { color: #2563eb; margin-top: 28px; }
@@ -58,11 +60,13 @@ jobs:
           tr:nth-child(even) { background: #f9fafb; }
           a { color: #2563eb; }
           hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+          p { margin: 6px 0; }
+          </style>
           EOF
 
           pandoc /tmp/test-briefing.md \
             -f markdown -t html -s \
-            --css /tmp/style.css \
+            -H /tmp/style-header.html \
             --metadata title="每日金融市场资讯简报 测试版" \
             -o /tmp/test-briefing.html
 
