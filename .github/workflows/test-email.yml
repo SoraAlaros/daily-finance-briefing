@@ -9,35 +9,74 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Create sample briefing
+      - name: Install dependencies
         run: |
-          cat > /tmp/test-briefing.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head><meta charset="utf-8"><title>简报测试</title></head>
-          <body style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
-          <h1>📊 每日金融市场资讯简报 — 测试版</h1>
-          <p>这是一封测试邮件，用于验证邮件发送功能是否正常。</p>
-          <h2>美股收盘</h2>
-          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%">
-            <tr style="background:#f0f0f0"><th>指数</th><th>收盘点位</th><th>当日涨跌幅</th><th>YTD</th></tr>
-            <tr><td>标普500 (S&P 500)</td><td>5,842.31</td><td>+0.67%</td><td>+9.14%</td></tr>
-            <tr><td>纳斯达克 (Nasdaq)</td><td>18,923.56</td><td>+0.76%</td><td>+6.83%</td></tr>
-            <tr><td>道琼斯 (DJIA)</td><td>42,108.44</td><td>+0.45%</td><td>+4.21%</td></tr>
-          </table>
-          <h2>🏦 华尔街观点（示例）</h2>
-          <p><strong>高盛：</strong>维持年底标普500目标价6,500点，超配科技与AI基础设施。</p>
-          <p><strong>摩根士丹利：</strong>建议缩短组合久期，10年期美债或测试4.75%阻力位。</p>
-          <hr>
-          <p style="color:gray; font-size:12px">
-            简报生成时间：测试 | 
-            数据来源：Bloomberg、华尔街见闻、金融时报、华尔街日报等
-          </p>
-          </body>
-          </html>
+          sudo apt-get update -q
+          sudo apt-get install -y pandoc wkhtmltopdf fonts-noto-cjk -q
+
+      - name: Create sample briefing and generate PDF
+        run: |
+          cat > /tmp/test-briefing.md << 'EOF'
+          # 每日金融市场资讯简报 — 测试版
+
+          ## 📊 美股收盘
+
+          **三大指数**
+
+          | 指数 | 收盘点位 | 当日涨跌幅 | YTD |
+          |------|---------|------------|-----|
+          | 标普500 (S&P 500) | 5,842.31 | +0.67% | +9.14% |
+          | 纳斯达克 (Nasdaq) | 18,923.56 | +0.76% | +6.83% |
+          | 道琼斯 (DJIA) | 42,108.44 | +0.45% | +4.21% |
+
+          **美债与美元**
+
+          | 指标 | 当前值 | 当日变化 | YTD |
+          |------|--------|----------|-----|
+          | 10年期美债收益率 | 4.52% | +3 bps | +27 bps |
+          | 美元指数 (DXY) | 103.84 | +0.21% | -3.46% |
+
+          ## 🏦 华尔街观点
+
+          **高盛：** 维持年底标普500目标价6,500点，超配科技与AI基础设施。
+
+          **摩根士丹利：** 建议缩短组合久期，10年期美债或测试4.75%阻力位。
+
+          ---
+          *简报生成时间：测试*
+          *数据来源：Bloomberg、华尔街见闻、金融时报、华尔街日报等*
           EOF
 
-      - name: Send test email
+          cat > /tmp/style.css << 'EOF'
+          body { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.7; }
+          h1 { color: #1a1a1a; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
+          h2 { color: #2563eb; margin-top: 28px; }
+          h3 { color: #374151; }
+          table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+          th { background: #2563eb; color: white; padding: 8px 12px; text-align: left; }
+          td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; }
+          tr:nth-child(even) { background: #f9fafb; }
+          a { color: #2563eb; }
+          hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+          EOF
+
+          pandoc /tmp/test-briefing.md \
+            -f markdown -t html -s \
+            --css /tmp/style.css \
+            --metadata title="每日金融市场资讯简报 测试版" \
+            -o /tmp/test-briefing.html
+
+          wkhtmltopdf \
+            --encoding utf-8 \
+            --page-size A4 \
+            --margin-top 15mm \
+            --margin-bottom 15mm \
+            --margin-left 15mm \
+            --margin-right 15mm \
+            /tmp/test-briefing.html \
+            /tmp/每日金融简报-测试版.pdf
+
+      - name: Send test email with PDF attachment
         uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
@@ -45,7 +84,8 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "📊 【测试】每日金融市场资讯简报"
+          subject: "📊 【测试】每日金融市场资讯简报（含PDF附件）"
           to: samchen3129@gmail.com
           from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
           html_body: file:///tmp/test-briefing.html
+          attachments: /tmp/每日金融简报-测试版.pdf
