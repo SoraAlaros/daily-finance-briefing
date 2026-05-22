@@ -1,0 +1,51 @@
+name: Send Daily Financial Briefing Email
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'briefings/zh/**.md'
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get new briefing file
+        id: briefing
+        run: |
+          FILE=$(git diff --name-only HEAD~1 HEAD -- 'briefings/zh/*.md' | head -1)
+          if [ -z "$FILE" ]; then
+            echo "No new briefing file, skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          DATE=$(basename "$FILE" .md)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Convert Markdown to HTML
+        if: steps.briefing.outputs.skip != 'true'
+        run: |
+          sudo apt-get install -y pandoc -q
+          pandoc "${{ steps.briefing.outputs.file }}" \
+            -f markdown -t html -s \
+            --metadata title="每日金融市场资讯简报 ${{ steps.briefing.outputs.date }}" \
+            -o /tmp/briefing.html
+
+      - name: Send email
+        if: steps.briefing.outputs.skip != 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "📊 每日金融市场资讯简报 — ${{ steps.briefing.outputs.date }}"
+          to: samchen3129@gmail.com,peiwenzhou2@gmail.com
+          from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
+          html_body: file:///tmp/briefing.html
