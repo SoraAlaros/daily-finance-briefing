@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - 'briefings/zh/**.md'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Briefing date (YYYY-MM-DD)'
+        required: true
+
 
 jobs:
   send-email:
@@ -19,15 +25,26 @@ jobs:
       - name: Get new briefing file
         id: briefing
         run: |
-          FILE=$(git diff --name-only HEAD~1 HEAD -- 'briefings/zh/*.md' | head -1)
-          if [ -z "$FILE" ]; then
-            echo "No new briefing file, skipping."
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            DATE="${{ github.event.inputs.date }}"
+            FILE="briefings/zh/${DATE}.md"
+          else
+            FILE=$(git diff --name-only HEAD~1 HEAD -- 'briefings/zh/*.md' | head -1)
+            if [ -z "$FILE" ]; then
+              echo "No new briefing file, skipping."
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            DATE=$(basename "$FILE" .md)
+          fi
+          if [ ! -f "$FILE" ]; then
+            echo "File $FILE not found."
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          DATE=$(basename "$FILE" .md)
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "date=$DATE" >> $GITHUB_OUTPUT
+
 
       - name: Install dependencies
         if: steps.briefing.outputs.skip != 'true'
