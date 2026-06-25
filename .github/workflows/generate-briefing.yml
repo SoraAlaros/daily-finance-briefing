@@ -94,24 +94,3 @@ jobs:
             git push
             echo "Briefing pushed — send-briefing.yml will trigger automatically."
           fi
-
-      - name: Notify on failure
-        if: failure()
-        uses: dawidd6/action-send-mail@v4
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "⚠️ 每日简报生成失败 — ${{ steps.date.outputs.date }}"
-          to: samchen3129@gmail.com
-          from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
-          body: |
-            今日金融市场资讯简报生成失败。
-
-            日期：${{ steps.date.outputs.date }}
-            工作流：generate-briefing.yml
-
-            请前往 GitHub Actions 查看详细错误日志：
-            https://github.com/SoraAlaros/daily-finance-briefing/actions
