@@ -5,12 +5,6 @@ on:
     branches: [main]
     paths:
       - 'briefings/zh/**.md'
-  workflow_dispatch:
-    inputs:
-      date:
-        description: 'Briefing date (YYYY-MM-DD)'
-        required: true
-
 
 jobs:
   send-email:
@@ -25,26 +19,15 @@ jobs:
       - name: Get new briefing file
         id: briefing
         run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            DATE="${{ github.event.inputs.date }}"
-            FILE="briefings/zh/${DATE}.md"
-          else
-            FILE=$(git diff --name-only HEAD~1 HEAD -- 'briefings/zh/*.md' | head -1)
-            if [ -z "$FILE" ]; then
-              echo "No new briefing file, skipping."
-              echo "skip=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            DATE=$(basename "$FILE" .md)
-          fi
-          if [ ! -f "$FILE" ]; then
-            echo "File $FILE not found."
+          FILE=$(git diff --name-only HEAD~1 HEAD -- 'briefings/zh/*.md' | head -1)
+          if [ -z "$FILE" ]; then
+            echo "No new briefing file, skipping."
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
+          DATE=$(basename "$FILE" .md)
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "date=$DATE" >> $GITHUB_OUTPUT
-
 
       - name: Install dependencies
         if: steps.briefing.outputs.skip != 'true'
@@ -102,3 +85,24 @@ jobs:
           from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
           html_body: file:///tmp/briefing.html
           attachments: /tmp/每日金融简报-${{ steps.briefing.outputs.date }}.pdf
+
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v4
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "⚠️ 每日简报邮件发送失败 — ${{ steps.briefing.outputs.date }}"
+          to: samchen3129@gmail.com
+          from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            今日金融市场资讯简报邮件发送失败（PDF生成或SMTP错误）。
+
+            日期：${{ steps.briefing.outputs.date }}
+            工作流：send-briefing.yml
+
+            请前往 GitHub Actions 查看详细错误日志：
+            https://github.com/SoraAlaros/daily-finance-briefing/actions

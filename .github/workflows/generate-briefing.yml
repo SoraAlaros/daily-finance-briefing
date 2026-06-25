@@ -1,0 +1,117 @@
+name: Generate Daily Financial Briefing
+
+on:
+  schedule:
+    # 主触发：4:30pm EDT (UTC-4, 夏令时)
+    - cron: '30 20 * * 1-5'
+    # 备份触发：主触发延迟/跳过时兜底（1小时后），同时兼容冬令时 EST (UTC-5) 的 4:30pm
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  generate-briefing:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Get current date (America/New_York)
+        id: date
+        run: echo "date=$(TZ='America/New_York' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Check if briefing already exists (deduplication)
+        id: dedup
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          if [ -f "briefings/zh/${DATE}.md" ]; then
+            echo "Briefing for ${DATE} already exists, skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch market data from Yahoo Finance
+        if: steps.dedup.outputs.skip != 'true'
+        run: |
+          python scripts/fetch_market_data.py
+          echo "--- market_data.json summary ---"
+          python -c "
+          import json
+          with open('market_data.json') as f:
+              d = json.load(f)
+          print(f\"Date: {d['date']}\")
+          print(f\"Indices: {len(d['indices'])}, Sectors: {len(d['sectors'])}, Top movers: {len(d['top_movers'])}\")
+          for m in d['top_movers'][:3]:
+              print(f\"  {m['ticker']}: {m['pct_str']}\")
+          "
+
+      - name: Generate briefing via Claude API
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/generate_briefing.py
+
+      - name: Verify briefing was created
+        if: steps.dedup.outputs.skip != 'true'
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          if [ ! -f "briefings/zh/${DATE}.md" ]; then
+            echo "ERROR: briefings/zh/${DATE}.md not found"
+            exit 1
+          fi
+          wc -l "briefings/zh/${DATE}.md"
+          head -3 "briefings/zh/${DATE}.md"
+
+      - name: Commit and push briefing
+        if: steps.dedup.outputs.skip != 'true'
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "briefings/zh/${DATE}.md"
+
+          if git diff --staged --quiet; then
+            echo "Nothing to commit (race condition avoided)."
+          else
+            git commit -m "📊 Daily briefing: ${DATE}"
+            git push
+            echo "Briefing pushed — send-briefing.yml will trigger automatically."
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v4
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "⚠️ 每日简报生成失败 — ${{ steps.date.outputs.date }}"
+          to: samchen3129@gmail.com
+          from: "每日金融简报 <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            今日金融市场资讯简报生成失败。
+
+            日期：${{ steps.date.outputs.date }}
+            工作流：generate-briefing.yml
+
+            请前往 GitHub Actions 查看详细错误日志：
+            https://github.com/SoraAlaros/daily-finance-briefing/actions
