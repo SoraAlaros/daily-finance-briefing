@@ -61,10 +61,10 @@ jobs:
               print(f\"  {m['ticker']}: {m['pct_str']}\")
           "
 
-      - name: Generate briefing via Claude API
+      - name: Generate briefing via Gemini API
         if: steps.dedup.outputs.skip != 'true'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python scripts/generate_briefing.py
 
       - name: Verify briefing was created
