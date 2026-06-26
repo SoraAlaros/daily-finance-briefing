@@ -55,9 +55,8 @@ jobs:
           EOF
 
           pandoc "${{ steps.briefing.outputs.file }}" \
-            -f markdown -t html -s \
+            -f gfm+raw_html -t html -s \
             -H /tmp/style-header.html \
-            --metadata title="每日金融市场资讯简报 ${{ steps.briefing.outputs.date }}" \
             -o /tmp/briefing.html
 
           wkhtmltopdf \
