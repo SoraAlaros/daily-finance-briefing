@@ -2,10 +2,14 @@ name: Generate Daily Financial Briefing
 
 on:
   schedule:
-    # 主触发：4:30pm EDT (UTC-4, 夏令时)
+    # 夏令时 EDT (UTC-4): 主触发 4:30pm
     - cron: '30 20 * * 1-5'
-    # 备份触发：主触发延迟/跳过时兜底（1小时后），同时兼容冬令时 EST (UTC-5) 的 4:30pm
+    # 夏令时 EDT (UTC-4): 备用触发 4:45pm（主触发未运行时兜底）
+    - cron: '45 20 * * 1-5'
+    # 冬令时 EST (UTC-5): 主触发 4:30pm
     - cron: '30 21 * * 1-5'
+    # 冬令时 EST (UTC-5): 备用触发 4:45pm
+    - cron: '45 21 * * 1-5'
   workflow_dispatch:
 
 jobs:
