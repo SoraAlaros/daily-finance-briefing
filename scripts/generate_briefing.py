@@ -157,12 +157,12 @@ def generate_briefing(market_data: dict) -> str:
     messages = [{"role": "user", "content": user_prompt}]
     all_text = []
 
-    # 支持 pause_turn（服务端工具循环超过10次时继续）
-    for iteration in range(4):
+    # 支持 pause_turn / max_tokens 续写（服务端工具循环或 token 不足时继续）
+    for iteration in range(6):
         print(f"  Claude API call (iteration {iteration + 1})...", flush=True)
         with client.messages.stream(
             model="claude-opus-4-8",
-            max_tokens=8000,
+            max_tokens=16000,
             thinking={"type": "adaptive"},
             output_config={"effort": "high"},
             system=[
@@ -182,13 +182,19 @@ def generate_briefing(market_data: dict) -> str:
             if block.type == "text" and block.text.strip():
                 all_text.append(block.text)
 
-        if final.stop_reason != "pause_turn":
-            print(f"  Done (stop_reason={final.stop_reason})")
+        print(f"  Done (stop_reason={final.stop_reason})", flush=True)
+
+        if final.stop_reason in ("end_turn",):
             break
 
-        # pause_turn：追加 assistant 消息后继续
-        messages.append({"role": "assistant", "content": final.content})
-        print("  pause_turn — continuing...")
+        if final.stop_reason in ("pause_turn", "max_tokens"):
+            # 追加 assistant 消息后继续
+            messages.append({"role": "assistant", "content": final.content})
+            print("  Continuing...", flush=True)
+            continue
+
+        # 其他 stop_reason（如 stop_sequence）也终止
+        break
 
     briefing = "".join(all_text).strip()
 
@@ -199,6 +205,8 @@ def generate_briefing(market_data: dict) -> str:
     header = "# 每日金融市场资讯简报"
     if header in briefing:
         briefing = briefing[briefing.index(header):]
+    else:
+        raise ValueError(f"Briefing header not found — output may be truncated. Preview: {briefing[:200]}")
 
     return briefing
 
