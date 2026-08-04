@@ -1,17 +1,15 @@
 name: Generate Daily Financial Briefing
 
 on:
-  # schedule 已暂停（Anthropic API credits 已用尽，切换为 Claude Routine 生成模式）
-  # 充值后取消下方注释恢复自动触发
-  # schedule:
-  #   # 夏令时 EDT (UTC-4): 主触发 4:30pm
-  #   - cron: '30 20 * * 1-5'
-  #   # 夏令时 EDT (UTC-4): 备用触发 4:45pm（主触发未运行时兜底）
-  #   - cron: '45 20 * * 1-5'
-  #   # 冬令时 EST (UTC-5): 主触发 4:30pm
-  #   - cron: '30 21 * * 1-5'
-  #   # 冬令时 EST (UTC-5): 备用触发 4:45pm
-  #   - cron: '45 21 * * 1-5'
+  schedule:
+    # 夏令时 EDT (UTC-4): 主触发 4:30pm
+    - cron: '30 20 * * 1-5'
+    # 夏令时 EDT (UTC-4): 备用触发 4:45pm（主触发未运行时兜底）
+    - cron: '45 20 * * 1-5'
+    # 冬令时 EST (UTC-5): 主触发 4:30pm
+    - cron: '30 21 * * 1-5'
+    # 冬令时 EST (UTC-5): 备用触发 4:45pm
+    - cron: '45 21 * * 1-5'
   workflow_dispatch:
 
 jobs:
