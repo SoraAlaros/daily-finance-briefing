@@ -1,9 +1,10 @@
 """
 validate_briefing.py
 检查生成的简报是否完整，拦截"摘要版"坏稿（如 2026-10-27、2026-11-03：
-模型只输出各章节一句话概述 + "几点说明"，而非完整简报）。
+模型只输出各章节一句话概述 + "几点说明"，而非完整简报；或如 2026-06-30 输出被截断），
+并提供 strip_chatter() 清理页脚之后的对话式尾巴。
 
-阈值依据：2026-05 ~ 2026-11 共 103 份正常简报的最小值，留出余量。
+阈值依据：2026-05 ~ 2026-11 共 102 份正常简报的最小值，留出余量。
 
 用法：
   python scripts/validate_briefing.py briefings/zh/2026-11-03.md [更多文件...]
@@ -20,13 +21,36 @@ REQUIRED_SECTIONS = {
     "📊": ("美股收盘", 1500),
     "🌍": ("全球市场与今日要闻", 1500),
     "🏦": ("华尔街观点", 700),
-    "🔭": ("明日关注", 0),
+    "🔭": ("明日关注", 250),  # 正常稿最小 451；2026-06-30 截断稿仅 55
 }
 
 MIN_TABLE_ROWS = 20  # 三大指数 + 11 板块 + 美债美元 + 个股，正常稿最少 26 行
 
-# 对话式尾巴：只警告，不判失败（历史上不少正常稿也带）
+# 页脚首行；缺失说明输出被截断
+FOOTER_RE = re.compile(r"^\*简报生成时间", re.M)
+
+# 对话式内容：strip_chatter() 清理后若仍残留则警告
 CHATTER_PATTERNS = ["您提供", "需要我", "已导出", "几点说明"]
+
+
+def strip_chatter(text: str) -> str:
+    """删除页脚之后的对话式尾巴（"几点说明"、"需要我导出 PDF 吗？"等）。
+
+    页脚 = "*简报生成时间…*" 行及其后紧接的斜体行（数据来源、注）。
+    找不到页脚时原样返回，交给 validate() 报错。
+    """
+    matches = list(FOOTER_RE.finditer(text))
+    if not matches:
+        return text
+    lines = text[matches[-1].start():].split("\n")
+    keep = 1
+    for i, line in enumerate(lines[1:], start=1):
+        if line.startswith("*"):
+            keep = i + 1
+        elif line.strip():
+            break
+    footer = "\n".join(lines[:keep])
+    return text[:matches[-1].start()] + footer + "\n"
 
 
 def validate(text: str):
@@ -52,6 +76,9 @@ def validate(text: str):
     rows = len(re.findall(r"^\|", text, flags=re.M))
     if rows < MIN_TABLE_ROWS:
         errors.append(f"表格行数 {rows} < {MIN_TABLE_ROWS}")
+
+    if not FOOTER_RE.search(text):
+        errors.append("缺少页脚 '*简报生成时间…*'（疑似输出被截断）")
 
     found = [p for p in CHATTER_PATTERNS if p in text]
     if found:
