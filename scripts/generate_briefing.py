@@ -13,7 +13,7 @@ from pathlib import Path
 
 import anthropic
 
-from validate_briefing import validate
+from validate_briefing import strip_chatter, validate
 
 MAX_ATTEMPTS = 3  # 坏稿（摘要版）自动重新生成的最大次数
 
@@ -230,7 +230,7 @@ def main():
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         print(f"Attempt {attempt}/{MAX_ATTEMPTS}")
-        briefing = generate_briefing(market_data)
+        briefing = strip_chatter(generate_briefing(market_data))
         errors, warnings = validate(briefing)
         for w in warnings:
             print(f"  WARN: {w}")
