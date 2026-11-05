@@ -13,6 +13,10 @@ from pathlib import Path
 
 import anthropic
 
+from validate_briefing import validate
+
+MAX_ATTEMPTS = 3  # 坏稿（摘要版）自动重新生成的最大次数
+
 SYSTEM_PROMPT = """你是一名专业的金融分析师助手，负责每日生成一份高质量的金融市场资讯简报（中文版）。
 
 ## 最重要的规则：数据准确性
@@ -152,6 +156,7 @@ def generate_briefing(market_data: dict) -> str:
 
 **关键提醒：市场数据（指数点位/涨跌幅/债券/外汇/个股pct_str）必须100%使用上方JSON中的精确数字，不得修改。**
 搜索时请高效，控制在10次以内。
+**直接输出完整简报正文（每条要闻、每条华尔街观点都要写全），不要输出摘要版、"几点说明"或向用户提问。**
 """
 
     messages = [{"role": "user", "content": user_prompt}]
@@ -223,7 +228,20 @@ def main():
     date_str = market_data["date"]
     print(f"Generating briefing for {date_str}...")
 
-    briefing = generate_briefing(market_data)
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        print(f"Attempt {attempt}/{MAX_ATTEMPTS}")
+        briefing = generate_briefing(market_data)
+        errors, warnings = validate(briefing)
+        for w in warnings:
+            print(f"  WARN: {w}")
+        if not errors:
+            break
+        print("  Briefing failed validation:")
+        for e in errors:
+            print(f"    ERROR: {e}")
+    else:
+        print(f"Error: briefing still invalid after {MAX_ATTEMPTS} attempts, not saving.", file=sys.stderr)
+        sys.exit(1)
 
     output_dir = Path("briefings/zh")
     output_dir.mkdir(parents=True, exist_ok=True)
