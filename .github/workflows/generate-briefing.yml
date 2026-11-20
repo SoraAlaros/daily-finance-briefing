@@ -10,7 +10,13 @@ on:
     - cron: '30 21 * * 1-5'
     # 冬令时 EST (UTC-5): 备用触发 4:45pm
     - cron: '45 21 * * 1-5'
+  # cron-job.org 每个交易日 4:35pm ET 准时调用（GitHub schedule 常延迟 3-6 小时，仅作兜底）
   workflow_dispatch:
+
+# 同一时间只跑一个：后到的 run 排队，等前一个 push 完再做去重检查，避免重复调用 Claude API
+concurrency:
+  group: generate-briefing
+  cancel-in-progress: false
 
 jobs:
   generate-briefing:
